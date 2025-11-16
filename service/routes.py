@@ -31,14 +31,14 @@ def health():
 def list_accounts():
     """
     List all Accounts
-    This endpoint returns a list of all accounts as JSON
     """
     app.logger.info("Request to list Accounts")
 
     accounts = Account.all()
     results = [account.serialize() for account in accounts]
 
-    return results, status.HTTP_200_OK
+    return jsonify(results), status.HTTP_200_OK
+
 
 
 ######################################################################
