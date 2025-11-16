@@ -142,3 +142,25 @@ class TestAccountService(TestCase):
         data = resp.get_json()
         self.assertEqual(data["name"], test_account["name"])
         self.assertEqual(data["address"], test_account["address"])
+
+
+    def test_delete_account(self):
+        """It should Delete an existing Account"""
+        # First create an account
+        resp = self.client.post(
+            BASE_URL,
+            json={"name": "John", "email": "john@example.com"}
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+        account_id = resp.get_json()["id"]
+
+        # Delete it
+        resp = self.client.delete(f"{BASE_URL}/{account_id}")
+        self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
+
+
+    def test_delete_nonexistent_account(self):
+    """It should return 204 when deleting a non-existent Account"""
+    resp = self.client.delete(f"{BASE_URL}/0")
+    self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
