@@ -161,6 +161,22 @@ class TestAccountService(TestCase):
 
 
     def test_delete_nonexistent_account(self):
-    """It should return 204 when deleting a non-existent Account"""
-    resp = self.client.delete(f"{BASE_URL}/0")
-    self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
+        """It should return 204 when deleting a non-existent Account"""
+        resp = self.client.delete(f"{BASE_URL}/0")
+        self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
+
+
+    def test_list_all_accounts(self):
+        """It should List all Accounts"""
+        
+        # Create two accounts
+        self.client.post(BASE_URL, json={"name": "A", "email": "a@test.com"})
+        self.client.post(BASE_URL, json={"name": "B", "email": "b@test.com"})
+
+        # Call list endpoint
+        resp = self.client.get(BASE_URL)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+        data = resp.get_json()
+        self.assertIsInstance(data, list)
+        self.assertGreaterEqual(len(data), 2)
