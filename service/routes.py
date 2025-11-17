@@ -9,6 +9,7 @@ from service.common import status
 ######################################################################
 @app.route("/", methods=["GET"])
 def index():
+    """Return a simple health message"""
     return jsonify(message="Account Service is running"), status.HTTP_200_OK
 
 
@@ -25,6 +26,7 @@ def health():
 ######################################################################
 @app.route("/accounts", methods=["GET"])
 def list_accounts():
+    """List all Accounts"""
     app.logger.info("Request to list Accounts")
     accounts = Account.all()
     results = [account.serialize() for account in accounts]
@@ -36,10 +38,11 @@ def list_accounts():
 ######################################################################
 @app.route("/accounts", methods=["POST"])
 def create_accounts():
+    """Create an Account"""
     app.logger.info("Request to create an Account")
 
-    # FIX: use is_json so charset=UTF-8 won't break it
-    if not request.is_json:
+    # Validate content-type
+    if request.content_type != "application/json":
         abort(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
               "Content-Type must be application/json")
 
@@ -75,10 +78,12 @@ def get_account(account_id):
 ######################################################################
 @app.route("/accounts/<int:account_id>", methods=["PUT"])
 def update_account(account_id):
-    app.logger.info("Request to update Account %s", account_id)
+    """Update an Account"""
+    app.logger.info("Request to update an Account with id: %s", account_id)
 
-    if not request.is_json:
-        abort(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
+    if request.content_type != "application/json":
+        abort(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+              "Content-Type must be application/json")
 
     account = Account.find(account_id)
     if not account:
@@ -96,7 +101,8 @@ def update_account(account_id):
 ######################################################################
 @app.route("/accounts/<int:account_id>", methods=["DELETE"])
 def delete_account(account_id):
-    app.logger.info("Request to delete Account %s", account_id)
+    """Delete an Account"""
+    app.logger.info("Request to delete an Account with id: %s", account_id)
 
     account = Account.find(account_id)
     if account:
