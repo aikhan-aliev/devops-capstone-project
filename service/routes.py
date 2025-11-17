@@ -1,19 +1,16 @@
-"""
-Account Service Routes
-
-Paths:
-------
-GET /accounts               -> List all accounts
-POST /accounts              -> Create an account
-GET /accounts/<id>          -> Read an account
-PUT /accounts/<id>          -> Update an account
-DELETE /accounts/<id>       -> Delete an account
-"""
-
-from flask import jsonify, request, abort
+from flask import jsonify, request, abort, url_for
 from service.models import Account
 from service import app
 from service.common import status
+
+
+######################################################################
+# HOME PAGE
+######################################################################
+@app.route("/", methods=["GET"])
+def index():
+    """Return a simple health message"""
+    return jsonify(message="Account Service is running"), status.HTTP_200_OK
 
 
 ######################################################################
@@ -30,16 +27,13 @@ def health():
 ######################################################################
 @app.route("/accounts", methods=["GET"])
 def list_accounts():
-    """
-    List all Accounts
-    This endpoint returns a list of all accounts as JSON
-    """
+    """List all Accounts"""
     app.logger.info("Request to list Accounts")
 
     accounts = Account.all()
     results = [account.serialize() for account in accounts]
 
-    return results, status.HTTP_200_OK
+    return jsonify(results), status.HTTP_200_OK
 
 
 ######################################################################
@@ -47,19 +41,25 @@ def list_accounts():
 ######################################################################
 @app.route("/accounts", methods=["POST"])
 def create_accounts():
-    """
-    Creates an Account
-    This endpoint will create an Account based on the data in the body
-    """
+    """Create an Account"""
     app.logger.info("Request to create an Account")
 
+    # Validate content-type
+    if request.content_type != "application/json":
+        abort(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+              "Content-Type must be application/json")
+
     data = request.get_json()
+    if not data:
+        abort(status.HTTP_400_BAD_REQUEST, "Invalid JSON payload")
+
     account = Account()
     account.deserialize(data)
     account.create()
 
-    app.logger.info("Account with ID [%s] created.", account.id)
-    return account.serialize(), status.HTTP_201_CREATED
+    location_url = url_for("get_account", account_id=account.id, _external=True)
+
+    return jsonify(account.serialize()), status.HTTP_201_CREATED, {"Location": location_url}
 
 
 ######################################################################
@@ -67,17 +67,14 @@ def create_accounts():
 ######################################################################
 @app.route("/accounts/<int:account_id>", methods=["GET"])
 def get_account(account_id):
-    """
-    Reads an Account
-    This endpoint will read an Account based the account_id that is requested
-    """
+    """Read an Account"""
     app.logger.info("Request to read an Account with id: %s", account_id)
 
     account = Account.find(account_id)
     if not account:
         abort(status.HTTP_404_NOT_FOUND, f"Account with id [{account_id}] not found.")
 
-    return account.serialize(), status.HTTP_200_OK
+    return jsonify(account.serialize()), status.HTTP_200_OK
 
 
 ######################################################################
@@ -85,11 +82,12 @@ def get_account(account_id):
 ######################################################################
 @app.route("/accounts/<int:account_id>", methods=["PUT"])
 def update_account(account_id):
-    """
-    Update an Account
-    This endpoint updates an Account based on the posted data
-    """
+    """Update an Account"""
     app.logger.info("Request to update an Account with id: %s", account_id)
+
+    if request.content_type != "application/json":
+        abort(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+              "Content-Type must be application/json")
 
     account = Account.find(account_id)
     if not account:
@@ -99,7 +97,7 @@ def update_account(account_id):
     account.deserialize(data)
     account.update()
 
-    return account.serialize(), status.HTTP_200_OK
+    return jsonify(account.serialize()), status.HTTP_200_OK
 
 
 ######################################################################
@@ -107,10 +105,7 @@ def update_account(account_id):
 ######################################################################
 @app.route("/accounts/<int:account_id>", methods=["DELETE"])
 def delete_account(account_id):
-    """
-    Delete an Account
-    This endpoint will delete an Account based the account_id that is requested
-    """
+    """Delete an Account"""
     app.logger.info("Request to delete an Account with id: %s", account_id)
 
     account = Account.find(account_id)
