@@ -15,6 +15,7 @@ from service.models import Account
 from service import app
 from service.common import status
 
+
 ######################################################################
 # HEALTH CHECK
 ######################################################################
