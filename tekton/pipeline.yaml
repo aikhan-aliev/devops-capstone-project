@@ -42,12 +42,12 @@ spec:
           value: "python:3.9-slim"
         - name: args
           value:
-            ["--count", "--max-complexity=10", "--max-line-length=127", "--statistics"]
+            ["--count","--max-complexity=10","--max-line-length=127","--statistics"]
       runAfter:
         - clone
 
     # -----------------------------
-    # Tests Task
+    # Tests Task (nose)
     # -----------------------------
     - name: tests
       workspaces:
@@ -64,7 +64,7 @@ spec:
         - clone
 
     # -----------------------------
-    # Build Task
+    # Build Task (buildah)
     # -----------------------------
     - name: build
       workspaces:
@@ -77,5 +77,27 @@ spec:
         - name: IMAGE
           value: "$(params.build-image)"
       runAfter:
-        - tests
         - lint
+        - tests
+
+    # -----------------------------
+    # Deploy Task (openshift-client)
+    # -----------------------------
+    - name: deploy
+      workspaces:
+        - name: manifest-dir
+          workspace: pipeline-workspace
+      taskRef:
+        name: openshift-client
+        kind: ClusterTask
+      params:
+        - name: SCRIPT
+          value: |
+            echo "Updating manifest..."
+            sed -i "s|IMAGE_NAME_HERE|$(params.build-image)|g" deploy/deployment.yaml
+            cat deploy/deployment.yaml
+            echo "Deploying to OpenShift..."
+            oc apply -f deploy/
+            oc get pods -l app=accounts
+      runAfter:
+        - build
