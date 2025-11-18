@@ -5,6 +5,14 @@ from service.common import status
 
 
 ######################################################################
+# HOME PAGE
+######################################################################
+@app.route("/", methods=["GET"])
+def index():
+    return "Welcome to the Account service", status.HTTP_200_OK
+
+
+######################################################################
 # HEALTH CHECK
 ######################################################################
 @app.route("/health", methods=["GET"])
@@ -30,7 +38,6 @@ def list_accounts():
 def create_accounts():
     app.logger.info("Request to create an Account")
 
-    # Validate content type
     if "application/json" not in request.content_type:
         abort(
             status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
@@ -41,24 +48,20 @@ def create_accounts():
     if data is None:
         abort(status.HTTP_400_BAD_REQUEST, "Invalid JSON payload")
 
-    # REQUIRED FIELD: name
     if "name" not in data:
         abort(status.HTTP_400_BAD_REQUEST, "Missing required field: name")
 
-    # At least one of email or address MUST exist
     if "email" not in data and "address" not in data:
         abort(
             status.HTTP_400_BAD_REQUEST,
             "Must supply at least email or address"
         )
 
-    # Optional fields with safe defaults
     data.setdefault("email", "")
     data.setdefault("address", "")
     data.setdefault("phone_number", None)
     data.setdefault("date_joined", None)
 
-    # Create the account
     account = Account()
     try:
         account.deserialize(data)
@@ -67,7 +70,6 @@ def create_accounts():
 
     account.create()
 
-    # Location header
     location_url = url_for("get_account", account_id=account.id, _external=False)
 
     resp = jsonify(account.serialize())
@@ -111,7 +113,6 @@ def update_account(account_id):
     if data is None:
         abort(status.HTTP_400_BAD_REQUEST, "Invalid JSON payload")
 
-    # Patch missing optional values to current values
     data.setdefault("email", account.email)
     data.setdefault("address", account.address)
     data.setdefault("phone_number", account.phone_number)
