@@ -1,5 +1,5 @@
 from flask import jsonify, request, abort, url_for
-from service.models import Account
+from service.models import Account, DataValidationError
 from service import app
 from service.common import status
 
@@ -9,8 +9,7 @@ from service.common import status
 ######################################################################
 @app.route("/", methods=["GET"])
 def index():
-    """Return a simple health message"""
-    return jsonify(message="Account Service is running"), status.HTTP_200_OK
+    return "Welcome to the Account service", status.HTTP_200_OK
 
 
 ######################################################################
@@ -26,7 +25,6 @@ def health():
 ######################################################################
 @app.route("/accounts", methods=["GET"])
 def list_accounts():
-    """List all Accounts"""
     app.logger.info("Request to list Accounts")
     accounts = Account.all()
     results = [account.serialize() for account in accounts]
@@ -38,25 +36,52 @@ def list_accounts():
 ######################################################################
 @app.route("/accounts", methods=["POST"])
 def create_accounts():
-    """Create an Account"""
     app.logger.info("Request to create an Account")
 
-    # Validate content-type
-    if request.content_type != "application/json":
-        abort(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-              "Content-Type must be application/json")
+    # Validate content type
+    if "application/json" not in request.content_type:
+        abort(
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            "Content-Type must be application/json"
+        )
 
     data = request.get_json()
-    if not data:
+    if data is None:
         abort(status.HTTP_400_BAD_REQUEST, "Invalid JSON payload")
 
+    # REQUIRED FIELD: name
+    if "name" not in data:
+        abort(status.HTTP_400_BAD_REQUEST, "Missing required field: name")
+
+    # At least one of email or address MUST exist
+    if "email" not in data and "address" not in data:
+        abort(
+            status.HTTP_400_BAD_REQUEST,
+            "Must supply at least email or address"
+        )
+
+    # Optional fields with safe defaults
+    data.setdefault("email", "")
+    data.setdefault("address", "")
+    data.setdefault("phone_number", None)
+    data.setdefault("date_joined", None)
+
+    # Create the account
     account = Account()
-    account.deserialize(data)
+    try:
+        account.deserialize(data)
+    except DataValidationError as error:
+        abort(status.HTTP_400_BAD_REQUEST, str(error))
+
     account.create()
 
-    location_url = url_for("get_account", account_id=account.id, _external=True)
+    # Location header
+    location_url = url_for("get_account", account_id=account.id, _external=False)
 
-    return jsonify(account.serialize()), status.HTTP_201_CREATED, {"Location": location_url}
+    resp = jsonify(account.serialize())
+    resp.status_code = status.HTTP_201_CREATED
+    resp.headers["Location"] = location_url
+    return resp
 
 
 ######################################################################
@@ -68,7 +93,7 @@ def get_account(account_id):
 
     account = Account.find(account_id)
     if not account:
-        abort(status.HTTP_404_NOT_FOUND, f"Account with id [{account_id}] not found.")
+        abort(status.HTTP_404_NOT_FOUND, "Account not found")
 
     return jsonify(account.serialize()), status.HTTP_200_OK
 
@@ -78,21 +103,34 @@ def get_account(account_id):
 ######################################################################
 @app.route("/accounts/<int:account_id>", methods=["PUT"])
 def update_account(account_id):
-    """Update an Account"""
-    app.logger.info("Request to update an Account with id: %s", account_id)
+    app.logger.info("Request to update Account %s", account_id)
 
-    if request.content_type != "application/json":
-        abort(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-              "Content-Type must be application/json")
+    if "application/json" not in request.content_type:
+        abort(
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            "Content-Type must be application/json"
+        )
 
     account = Account.find(account_id)
     if not account:
-        abort(status.HTTP_404_NOT_FOUND, f"Account with id [{account_id}] not found.")
+        abort(status.HTTP_404_NOT_FOUND, "Account not found")
 
     data = request.get_json()
-    account.deserialize(data)
-    account.update()
+    if data is None:
+        abort(status.HTTP_400_BAD_REQUEST, "Invalid JSON payload")
 
+    # Patch missing optional values to current values
+    data.setdefault("email", account.email)
+    data.setdefault("address", account.address)
+    data.setdefault("phone_number", account.phone_number)
+    data.setdefault("date_joined", account.date_joined.isoformat())
+
+    try:
+        account.deserialize(data)
+    except DataValidationError as error:
+        abort(status.HTTP_400_BAD_REQUEST, str(error))
+
+    account.update()
     return jsonify(account.serialize()), status.HTTP_200_OK
 
 
@@ -101,8 +139,7 @@ def update_account(account_id):
 ######################################################################
 @app.route("/accounts/<int:account_id>", methods=["DELETE"])
 def delete_account(account_id):
-    """Delete an Account"""
-    app.logger.info("Request to delete an Account with id: %s", account_id)
+    app.logger.info("Request to delete Account %s", account_id)
 
     account = Account.find(account_id)
     if account:
